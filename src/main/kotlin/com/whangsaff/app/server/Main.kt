@@ -9,8 +9,9 @@ import javax.net.ssl.SSLServerSocket
 import javax.net.ssl.SSLServerSocketFactory
 
 fun main() {
-//    System.setProperty
 
     val port = 443
-
+    with(WhangsaffServer(port)) {
+        serve()
+    }
 }

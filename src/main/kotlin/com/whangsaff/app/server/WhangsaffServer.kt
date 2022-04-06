@@ -1,19 +1,25 @@
 package com.whangsaff.app.server
 
+import com.whangsaff.app.client.WhangsaffClient
 import com.whangsaff.app.common.Message
+import com.whangsaff.app.server.contract.ClientConnectionContract
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import java.io.ObjectInputStream
-import java.io.ObjectOutputStream
+import kotlinx.coroutines.launch
+import java.io.BufferedOutputStream
 import java.net.ServerSocket
+import java.net.Socket
 
 class WhangsaffServer(
     private val port: Int
-) {
+): ClientConnectionContract {
 
+    private val serverScope = CoroutineScope(Dispatchers.IO)
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
     private var serverJob: Job? = null
+    private val clientJobs = hashMapOf<String, Job>()
+    private val connectedClients = hashMapOf<String, WhangsaffClient>()
 
     fun serve() {
         val server = ServerSocket(port)
@@ -21,19 +27,70 @@ class WhangsaffServer(
 
         while (true) {
             println("= = = Waiting for client to connect = = =")
-            val client = server.accept()
-            println("= = = Connected = = =")
+            val socket = server.accept()
+            println("= = = ${socket.remoteSocketAddress} Connected = = =")
 
-            val objectInput = ObjectInputStream(client.getInputStream())
-            val objectOutput = ObjectOutputStream(client.getOutputStream())
+            val job = coroutineScope.launch {
+                val client = WhangsaffClient(socket, this@WhangsaffServer)
+//                try {
+                    client.serve()
+//                } catch (e: Exception) {
+//                    client.disconnect()
+//                    logException(e)
+//                }
+            }
 
-            val message = objectInput.readObject() as Message
-            objectOutput.writeObject(message)
-            objectOutput.flush()
-
-
-            client.close()
-
+            handleClientJob(socket, job)
         }
     }
+
+
+    private fun handleClientJob(socket: Socket, job: Job) {
+        with(clientJobs[socket.remoteSocketAddress.toString()]) {
+            if (this != null) {
+                job.cancel()
+                with(BufferedOutputStream(socket.getOutputStream())) {
+                    write("Multiple connection within same IP is not allowed".toByteArray())
+                    flush()
+                }
+                socket.close()
+            } else {
+                clientJobs[socket.remoteSocketAddress.toString()] = job
+            }
+        }
+    }
+
+    override fun onBroadcastMessage(senderKey: String, message: Message) {
+        println("= = = Broadcasted Client = = =")
+        println("${connectedClients.map { it.key }}")
+        connectedClients.forEach { key, client ->
+            if (key != senderKey) {
+                client.sendMessage(message)
+            }
+        }
+    }
+
+    override fun onClientConnected(key: String, client: WhangsaffClient) {
+        client.connect()
+        connectedClients[key] = client
+    }
+
+    override fun onClientDisconnected(key: String, client: WhangsaffClient) {
+        try {
+            println("= = = Client $key disconnected = = =")
+            clientJobs[key]?.cancel()
+            clientJobs.remove(key)
+            connectedClients.remove(key)
+        } catch (e: Exception) {
+            logException(e)
+        }
+    }
+
+    private fun logException(e: Exception) {
+
+        println("= = = Exception = = =")
+        println(e.toString())
+        println("= = = = = = =")
+    }
+
 }
