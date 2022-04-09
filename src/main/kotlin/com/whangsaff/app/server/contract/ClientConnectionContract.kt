@@ -10,4 +10,8 @@ interface ClientConnectionContract {
     fun onClientDisconnected(key: String, client: WhangsaffClient)
 
     fun onBroadcastMessage(senderKey: String, message: Message)
+
+    fun onPrivateMessage(message: Message)
+
+    fun onShowOnline(senderKey: String)
 }

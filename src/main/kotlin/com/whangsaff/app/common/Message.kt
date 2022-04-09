@@ -3,6 +3,8 @@ package com.whangsaff.app.common
 import java.io.Serializable
 
 data class Message(
-    val text: String,
-    val sender: String
+    val type: Int,
+    val text: Any,
+    val sender: String,
+    val receiver: String
 ): Serializable

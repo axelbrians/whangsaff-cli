@@ -2,6 +2,7 @@ package com.whangsaff.app.server
 
 import com.whangsaff.app.client.WhangsaffClient
 import com.whangsaff.app.common.Message
+import com.whangsaff.app.common.Online
 import com.whangsaff.app.server.contract.ClientConnectionContract
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,6 +21,7 @@ class WhangsaffServer(
     private var serverJob: Job? = null
     private val clientJobs = hashMapOf<String, Job>()
     private val connectedClients = hashMapOf<String, WhangsaffClient>()
+
 
     fun serve() {
         val server = ServerSocket(port)
@@ -63,11 +65,31 @@ class WhangsaffServer(
     override fun onBroadcastMessage(senderKey: String, message: Message) {
         println("= = = Broadcasted Client = = =")
         println("${connectedClients.map { it.key }}")
-        connectedClients.forEach { key, client ->
+        connectedClients.forEach { (key, client) ->
             if (key != senderKey) {
                 client.sendMessage(message)
             }
         }
+    }
+
+    override fun onPrivateMessage(message: Message) {
+        connectedClients.forEach { _, client ->
+            if(client.username == message.receiver) {
+                client.sendMessage(message)
+            }
+        }
+    }
+
+    override fun onShowOnline(senderKey: String) {
+        var userOnline: MutableList<String> = mutableListOf()
+        connectedClients.forEach { (key, client) ->
+            if (key != senderKey) {
+                userOnline.add(client.username)
+            }
+        }
+        val onlineUser = Online(userOnline)
+        val message = Message(2, onlineUser, "Server", "")
+        connectedClients[senderKey]?.sendMessage(message)
     }
 
     override fun onClientConnected(key: String, client: WhangsaffClient) {
