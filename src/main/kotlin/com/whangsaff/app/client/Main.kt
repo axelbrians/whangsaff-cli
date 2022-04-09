@@ -54,34 +54,39 @@ fun main() {
         flush()
     }
 
+
+    println("= = = Whangsaff Client = = =")
+    printHelp()
+
     while (true) {
         println("= = = Whangsaff Client = = =")
-        println("Type \"\\b Your Message Here\" to send Broadcast message")
-        println("Type \"\\s\" to show online user")
-        println("Type \"\\w Destination \\m Your Message Here\" to send private message")
+
 
         val text = readln()
         var message = Message(0, "", "", "")
-        if (text.startsWith("\\b")) {
-            val msg = text.removePrefix("\\b ")
+        if (text.startsWith("/b")) {
+            val msg = text.removePrefix("/b ")
             message = Message(1, msg, name, "")
         }
-        else if (text.startsWith("\\s")) {
+        else if (text.startsWith("/s")) {
             message = Message(2, "", name, "")
         }
-        else if (text.startsWith("\\w")) {
-            var receiver = text.substringAfter("\\w ")
-            receiver = receiver.substringBefore(" \\m", "No Target")
+        else if (text.equals("/exit", true)) {
+            readJob.cancel()
+            break
+        }
+        else if (text.startsWith("/w")) {
+            var receiver = text.substringAfter("/w ")
+            receiver = receiver.substringBefore(" /m", "No Target")
             if(receiver == "No Target") {
                 println("Error! No Receiver")
                 continue
             }
-            val msg = text.substringAfter("\\m ")
+            val msg = text.substringAfter("/m ")
             message = Message(3, msg, name, receiver)
         }
-        else if (text.equals(".exit", true)) {
-            readJob.cancel()
-            break
+        else if (text.equals("/h", true)) {
+            printHelp()
         }
         else {
             println("Unrecognized command")
@@ -95,4 +100,12 @@ fun main() {
             flush()
         }
     }
+}
+
+private fun printHelp() {
+    println("Type \"/b <message>\" to send Broadcast message")
+    println("Type \"/s\" to show online user")
+    println("Type \"/w <user> /m <message>\" to send private message")
+    println("Type \"/h To print this prompt.")
+    println("Type \"/exit To disconnect.")
 }
