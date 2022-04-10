@@ -3,6 +3,7 @@ package com.whangsaff.app.server
 import com.whangsaff.app.client.WhangsaffClient
 import com.whangsaff.app.common.Message
 import com.whangsaff.app.common.Online
+import com.whangsaff.app.common.getSocketKey
 import com.whangsaff.app.server.contract.ClientConnectionContract
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,9 +17,7 @@ class WhangsaffServer(
     private val port: Int
 ): ClientConnectionContract {
 
-    private val serverScope = CoroutineScope(Dispatchers.IO)
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
-    private var serverJob: Job? = null
     private val clientJobs = hashMapOf<String, Job>()
     private val connectedClients = hashMapOf<String, WhangsaffClient>()
 
@@ -34,12 +33,7 @@ class WhangsaffServer(
 
             val job = coroutineScope.launch {
                 val client = WhangsaffClient(socket, this@WhangsaffServer)
-//                try {
-                    client.serve()
-//                } catch (e: Exception) {
-//                    client.disconnect()
-//                    logException(e)
-//                }
+                client.serve()
             }
 
             handleClientJob(socket, job)
@@ -48,7 +42,7 @@ class WhangsaffServer(
 
 
     private fun handleClientJob(socket: Socket, job: Job) {
-        with(clientJobs[socket.remoteSocketAddress.toString()]) {
+        with(clientJobs[socket.getSocketKey()]) {
             if (this != null) {
                 job.cancel()
                 with(BufferedOutputStream(socket.getOutputStream())) {
@@ -57,31 +51,35 @@ class WhangsaffServer(
                 }
                 socket.close()
             } else {
-                clientJobs[socket.remoteSocketAddress.toString()] = job
+                clientJobs[socket.getSocketKey()] = job
             }
         }
     }
 
     override fun onBroadcastMessage(senderKey: String, message: Message) {
-        println("= = = Broadcasted Client = = =")
-        println("${connectedClients.map { it.key }}")
-        connectedClients.forEach { (key, client) ->
-            if (key != senderKey) {
-                client.sendMessage(message)
-            }
+        connectedClients.forEach { (_, client) ->
+            client.sendMessage(message)
         }
     }
 
-    override fun onPrivateMessage(message: Message) {
-        connectedClients.forEach { _, client ->
-            if(client.username == message.receiver) {
-                client.sendMessage(message)
+    override fun onPrivateMessage(message: Message, client: WhangsaffClient) {
+        var receiverClient: WhangsaffClient? = null
+        for ((_, wClient) in connectedClients) {
+            if (wClient.username == message.receiver) {
+                receiverClient = wClient
             }
+        }
+
+        if (receiverClient != null) {
+            receiverClient.sendMessage(message)
+        } else {
+            val userNotOnlineMessage = message.copy(text = "${message.receiver} is not online")
+            client.sendMessage(userNotOnlineMessage)
         }
     }
 
     override fun onShowOnline(senderKey: String) {
-        var userOnline: MutableList<String> = mutableListOf()
+        val userOnline: MutableList<String> = mutableListOf()
         connectedClients.forEach { (key, client) ->
             if (key != senderKey) {
                 userOnline.add(client.username)
@@ -109,7 +107,6 @@ class WhangsaffServer(
     }
 
     private fun logException(e: Exception) {
-
         println("= = = Exception = = =")
         println(e.toString())
         println("= = = = = = =")

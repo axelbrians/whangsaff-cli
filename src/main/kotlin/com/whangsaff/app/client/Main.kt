@@ -1,52 +1,25 @@
 package com.whangsaff.app.client
 
 import com.whangsaff.app.common.Message
+import com.whangsaff.app.common.MessageType
 import com.whangsaff.app.common.Online
 import com.whangsaff.app.common.User
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
+import java.io.InputStream
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.net.Socket
 
 fun main() {
     val socket = Socket("localhost", 443)
-
     val coroutineScope = CoroutineScope(Dispatchers.IO)
-    var writeJob: Job? = null
-    var readJob: Job? = null
-
-
     println("= = = Connected to localhost:443 = = =")
+
+    val readJob = handleReadMessage(coroutineScope, socket.getInputStream())
     val objectOutput = ObjectOutputStream(socket.getOutputStream())
 
 
-    readJob = coroutineScope.launch {
-        val objectInput = ObjectInputStream(socket.getInputStream())
-
-        while (true) {
-            val response = objectInput.readObject() as Message
-            if (response.type == 2 && response.sender == "Server") {
-                val listOnline: Online = response.text as Online
-                println("Online:")
-                for (online in listOnline.onlineUser!!) {
-                    println(online)
-                }
-            }
-            else {
-                println("= = = New Message = = =")
-                println("sender: ${response.sender}")
-                println(response.text)
-            }
-            println("= = = = = =")
-
-        }
-    }
-
-
-    println("Enter your username (1 word only):")
+    println("Enter your username (1 line only):")
     val name = readln()
     val user = User(name)
     with(objectOutput) {
@@ -55,57 +28,81 @@ fun main() {
     }
 
 
-    println("= = = Whangsaff Client = = =")
+    println("= = = Whangsaff-CLI = = =")
     printHelp()
 
     while (true) {
-        println("= = = Whangsaff Client = = =")
+        println("= = = Whangsaff-CLI = = =")
 
 
         val text = readln()
-        var message = Message(0, "", "", "")
+        var message: Message
         if (text.startsWith("/b")) {
             val msg = text.removePrefix("/b ")
-            message = Message(1, msg, name, "")
-        }
-        else if (text.startsWith("/s")) {
-            message = Message(2, "", name, "")
-        }
-        else if (text.equals("/exit", true)) {
+            message = Message(MessageType.BROADCAST.value, msg, name, "")
+        } else if (text.startsWith("/s")) {
+            message = Message(MessageType.ONLINE.value, "", name, "")
+        } else if (text.equals("/exit", true)) {
             readJob.cancel()
             break
-        }
-        else if (text.startsWith("/w")) {
+        } else if (text.startsWith("/w")) {
             var receiver = text.substringAfter("/w ")
             receiver = receiver.substringBefore(" /m", "No Target")
-            if(receiver == "No Target") {
+            if (receiver == "No Target") {
                 println("Error! No Receiver")
                 continue
             }
             val msg = text.substringAfter("/m ")
-            message = Message(3, msg, name, receiver)
-        }
-        else if (text.equals("/h", true)) {
+            message = Message(MessageType.WHISPER.value, msg, name, receiver)
+        } else if (text.equals("/h", true)) {
             printHelp()
-        }
-        else {
+            continue
+        } else {
             println("Unrecognized command")
             continue
         }
 
-//        val message = Message(text, name)
 
         with(objectOutput) {
             writeObject(message)
             flush()
         }
     }
+
+    coroutineScope.cancel()
+}
+
+private fun handleReadMessage(coroutineScope: CoroutineScope, inputStream: InputStream): Job {
+    return coroutineScope.launch {
+        val objectInput = ObjectInputStream(inputStream)
+
+        while (true) {
+            try {
+                val response = objectInput.readObject() as Message
+                if (response.type == MessageType.ONLINE.value && response.sender == "Server") {
+                    val listOnline: Online = response.text as Online
+                    println("Online:")
+                    for (online in listOnline.onlineUser!!) {
+                        println(online)
+                    }
+                } else {
+                    println("= = = New Message, from: ${response.sender} = = =")
+                    println(response.text)
+                }
+                println("= = = = = =")
+            } catch (e: Exception) {
+                println("= = = Something went wrong, message not received = = =")
+            }
+        }
+    }
 }
 
 private fun printHelp() {
-    println("Type \"/b <message>\" to send Broadcast message")
-    println("Type \"/s\" to show online user")
-    println("Type \"/w <user> /m <message>\" to send private message")
-    println("Type \"/h To print this prompt.")
-    println("Type \"/exit To disconnect.")
+    println("= = = Whangsaff-CLI Guide = = =")
+    println("/b <message> - broadcast message")
+    println("/s - see online users")
+    println("/w <username> /m <message> - send message to user")
+    println("/h - print help")
+    println("/exit - exit")
+    println("= = = = = =")
 }
