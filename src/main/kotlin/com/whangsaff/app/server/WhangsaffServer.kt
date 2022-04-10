@@ -5,6 +5,7 @@ import com.whangsaff.app.common.Message
 import com.whangsaff.app.common.MessageType
 import com.whangsaff.app.common.Online
 import com.whangsaff.app.common.getSocketKey
+import com.whangsaff.app.common.socket.SSLServerSocketKeystoreFactory
 import com.whangsaff.app.server.contract.ClientConnectionContract
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -13,18 +14,18 @@ import kotlinx.coroutines.launch
 import java.io.BufferedOutputStream
 import java.net.ServerSocket
 import java.net.Socket
+import javax.net.ssl.SSLServerSocket
 
-class WhangsaffServer(
-    private val port: Int
-): ClientConnectionContract {
+class WhangsaffServer(): ClientConnectionContract {
 
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
     private val clientJobs = hashMapOf<String, Job>()
     private val connectedClients = hashMapOf<String, WhangsaffClient>()
 
 
-    fun serve() {
-        val server = ServerSocket(port)
+    fun serve(port: Int) {
+        println("${System.getProperty("user.dir")}\\Whangsaff_Tech_Ltd_private.jks")
+        val server = initiateSSLSocket(port)
         println("= = = = Server up and Running at $port = = = =")
 
         while (true) {
@@ -109,6 +110,16 @@ class WhangsaffServer(
         } catch (e: Exception) {
             logException(e)
         }
+    }
+
+    private fun initiateSSLSocket(port: Int): ServerSocket {
+        return SSLServerSocketKeystoreFactory
+            .getServerSocketWithCert(
+                port,
+                "${System.getProperty("user.dir")}\\Whangsaff_Tech_Ltd_private.jks",
+                "password123",
+                SSLServerSocketKeystoreFactory.ServerSecureType.SSL
+            )
     }
 
     private fun logException(e: Exception) {

@@ -4,15 +4,18 @@ import com.whangsaff.app.common.Message
 import com.whangsaff.app.common.MessageType
 import com.whangsaff.app.common.Online
 import com.whangsaff.app.common.User
+import com.whangsaff.app.common.socket.SSLServerSocketKeystoreFactory
+import com.whangsaff.app.common.socket.SSLSocketKeystoreFactory
 import kotlinx.coroutines.*
 import java.io.InputStream
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.net.Socket
+import javax.net.ssl.SSLSocket
 import kotlin.system.exitProcess
 
 fun main() {
-    val socket = Socket("localhost", 443)
+    val socket = initiateClientSocket()
     val coroutineScope = CoroutineScope(Dispatchers.IO)
     println("= = = Connected to localhost:443 = = =")
 
@@ -103,6 +106,16 @@ private fun handleReadMessage(coroutineScope: CoroutineScope, inputStream: Input
             }
         }
     }
+}
+
+fun initiateClientSocket(): SSLSocket {
+    return SSLSocketKeystoreFactory.getSocketWithCert(
+        "localhost",
+        443,
+        "${System.getProperty("user.dir")}\\Whangsaff_Tech_Ltd_public.jks",
+        "password123",
+        SSLSocketKeystoreFactory.SecureType.SSL
+    )
 }
 
 private fun printHelp() {
