@@ -9,6 +9,7 @@ import java.io.InputStream
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.net.Socket
+import kotlin.system.exitProcess
 
 fun main() {
     val socket = Socket("localhost", 443)
@@ -27,8 +28,6 @@ fun main() {
         flush()
     }
 
-
-    println("= = = Whangsaff-CLI = = =")
     printHelp()
 
     while (true) {
@@ -68,30 +67,39 @@ fun main() {
             flush()
         }
     }
-
     coroutineScope.cancel()
 }
 
 private fun handleReadMessage(coroutineScope: CoroutineScope, inputStream: InputStream): Job {
     return coroutineScope.launch {
+        var crashCounter = 0
         val objectInput = ObjectInputStream(inputStream)
 
         while (true) {
+            if (crashCounter > 3) {
+                println("= = = Connection Lost = = =")
+                exitProcess(0)
+            }
+
             try {
                 val response = objectInput.readObject() as Message
                 if (response.type == MessageType.ONLINE.value && response.sender == "Server") {
-                    val listOnline: Online = response.text as Online
-                    println("Online:")
-                    for (online in listOnline.onlineUser!!) {
+                    val onlineUsers = response.text as Online
+                    println("Online users:")
+                    for (online in onlineUsers.onlineUser) {
                         println(online)
                     }
+                    crashCounter = 0
                 } else {
                     println("= = = New Message, from: ${response.sender} = = =")
                     println(response.text)
+                    crashCounter = 0
                 }
                 println("= = = = = =")
             } catch (e: Exception) {
+                crashCounter++
                 println("= = = Something went wrong, message not received = = =")
+                delay(1000)
             }
         }
     }

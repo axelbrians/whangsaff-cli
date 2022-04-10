@@ -26,8 +26,8 @@ class WhangsaffClient(
 
     fun serve() = try {
         clientContract.onClientConnected(socketKey, this)
-        val user = inputStream.readObject() as User
-        username = user.username
+        username = (inputStream.readObject() as User).username
+
         while (true) {
             if (!isConnected) {
                 break
@@ -39,7 +39,7 @@ class WhangsaffClient(
                     clientContract.onBroadcastMessage(socketKey, message)
                 }
                 MessageType.ONLINE.value -> {
-                    clientContract.onShowOnline(socketKey)
+                    clientContract.onShowOnline(this, socketKey)
                 }
                 MessageType.WHISPER.value -> {
                     clientContract.onPrivateMessage(message, this)
@@ -62,7 +62,7 @@ class WhangsaffClient(
         isConnected = true
     }
 
-    fun disconnect() {
+    private fun disconnect() {
         clientContract.onClientDisconnected(socketKey, this)
         isConnected = false
         socket.close()

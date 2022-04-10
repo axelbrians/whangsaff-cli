@@ -13,5 +13,5 @@ interface ClientConnectionContract {
 
     fun onPrivateMessage(message: Message, client: WhangsaffClient)
 
-    fun onShowOnline(senderKey: String)
+    fun onShowOnline(client: WhangsaffClient, senderKey: String)
 }
